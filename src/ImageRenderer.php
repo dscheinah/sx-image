@@ -3,47 +3,104 @@
 namespace Sx\Image;
 
 use GdImage;
+use Sx\Image\DTO\RenderedImageDTO;
 
 class ImageRenderer
 {
+    /**
+     * Try to read the given source file as jpeg.
+     *
+     * If width or height are given, the image is checked to have the correct sizes.
+     *
+     * @param string $source
+     * @param positive-int|null $width
+     * @param positive-int|null $height
+     *
+     * @return RenderedImageDTO|null
+     */
+    public function readFromJpeg(string $source, ?int $width = null, ?int $height = null): ?RenderedImageDTO
+    {
+        $data = @file_get_contents($source);
+        if (!$data) {
+            return null;
+        }
+
+        $sizes = getimagesize($source);
+        if (!$sizes) {
+            return null;
+        }
+        if ($sizes[2] !== IMAGETYPE_JPEG) {
+            return null;
+        }
+        if ($width && $sizes[0] !== $width) {
+            return null;
+        }
+        if ($height && $sizes[1] !== $height) {
+            return null;
+        }
+        assert($sizes[0] > 0);
+        assert($sizes[1] > 0);
+
+        $image = new RenderedImageDTO();
+        $image->base64 = base64_encode($data);
+        $image->width = $sizes[0];
+        $image->height = $sizes[1];
+        return $image;
+    }
+
     /**
      * Renders the given source image to the target file.
      *
      * The image will be scaled if width or height are given. If both are present, it is auto-cropped to the new ratio.
      *
-     * @param string            $source
-     * @param string            $target
+     * @param string $source
+     * @param string $target
      * @param positive-int|null $width
      * @param positive-int|null $height
      *
-     * @return bool
+     * @return RenderedImageDTO|null
      */
-    public function renderToJpeg(string $source, string $target, ?int $width = null, ?int $height = null): bool
+    public function renderToJpeg(string $source, string $target, ?int $width = null, ?int $height = null): ?RenderedImageDTO
     {
         $data = @file_get_contents($source);
         if (!$data) {
-            return false;
+            return null;
         }
         $sourceImage = imagecreatefromstring($data);
         if (!$sourceImage) {
-            return false;
+            return null;
         }
 
         $sizes = $this->sizes($sourceImage, $width, $height);
 
         $targetImage = imagecreatetruecolor($sizes[4], $sizes[5]);
         if (!$targetImage) {
-            return false;
+            return null;
         }
 
-        return imagecopyresampled($targetImage, $sourceImage, ...$sizes)
-            && imagejpeg($targetImage, $target);
+        if (!imagecopyresampled($targetImage, $sourceImage, ...$sizes)) {
+            return null;
+        }
+        if (!imagejpeg($targetImage, $target)) {
+            return null;
+        }
+
+        $file = file_get_contents($target);
+        if (!$file) {
+            return null;
+        }
+
+        $image = new RenderedImageDTO();
+        $image->base64 = base64_encode($file);
+        $image->width = $sizes[4];
+        $image->height = $sizes[5];
+        return $image;
     }
 
     /**
      * Calculates position and sizes to convert from source to target.
      *
-     * @param GdImage           $image
+     * @param GdImage $image
      * @param positive-int|null $width
      * @param positive-int|null $height
      *

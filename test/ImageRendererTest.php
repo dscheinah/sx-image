@@ -22,17 +22,33 @@ class ImageRendererTest extends TestCase
      */
     public function testRenderToJpeg(?int $width, ?int $height, int $expectedWidth, int $expectedHeight): void
     {
-        self::assertTrue(
-            $this->imageRenderer->renderToJpeg(__DIR__ . '/data/image.png', $this->testTarget, $width, $height)
-        );
+        $image = $this->imageRenderer->renderToJpeg(__DIR__ . '/data/image.png', $this->testTarget, $width, $height);
+
+        self::assertNotNull($image);
+        self::assertNotEmpty($image->base64);
+        self::assertEquals($expectedWidth, $image->width);
+        self::assertEquals($expectedHeight, $image->height);
 
         self::assertFileExists($this->testTarget);
+        self::assertStringEqualsFile($this->testTarget, base64_decode($image->base64));
 
-        $sizes = getimagesize($this->testTarget);
-        self::assertIsArray($sizes);
+        $testImage = $this->imageRenderer->readFromJpeg($this->testTarget, $width, $height);
 
-        self::assertEquals($expectedWidth, $sizes[0]);
-        self::assertEquals($expectedHeight, $sizes[1]);
+        self::assertEquals($image, $testImage);
+
+        self::assertNotNull($this->imageRenderer->readFromJpeg($this->testTarget));
+        self::assertNull($this->imageRenderer->readFromJpeg($this->testTarget, width: 1));
+        self::assertNull($this->imageRenderer->readFromJpeg($this->testTarget, height: 1));
+    }
+
+    public function testFileErrors(): void
+    {
+        self::assertNull($this->imageRenderer->renderToJpeg('/does/not/exists', $this->testTarget));
+        self::assertNull(@$this->imageRenderer->renderToJpeg(__FILE__, $this->testTarget));
+
+        self::assertNull($this->imageRenderer->readFromJpeg('/does/not/exists'));
+        self::assertNull($this->imageRenderer->readFromJpeg(__FILE__));
+        self::assertNull($this->imageRenderer->readFromJpeg(__DIR__ . '/data/image.png'));
     }
 
     public static function provideRenderToJpeg(): array
