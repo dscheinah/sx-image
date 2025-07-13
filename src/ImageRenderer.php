@@ -66,7 +66,7 @@ class ImageRenderer
         if (!$data) {
             return null;
         }
-        $sourceImage = imagecreatefromstring($data);
+        $sourceImage = @imagecreatefromstring($data);
         if (!$sourceImage) {
             return null;
         }
